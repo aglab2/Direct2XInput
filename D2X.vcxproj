@@ -155,7 +155,6 @@
     <ClInclude Include="ConfigLoader.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="ini.h" />
-    <ClInclude Include="INIReader.h" />
     <ClInclude Include="log.h" />
     <ClInclude Include="wind.h" />
     <ClInclude Include="XInputEmulator.h" />
@@ -164,7 +163,6 @@
     <ClCompile Include="ConfigLoader.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="ini.c" />
-    <ClCompile Include="INIReader.cpp" />
     <ClCompile Include="log.cpp" />
     <ClCompile Include="XInputEmulator.cpp" />
   </ItemGroup>
