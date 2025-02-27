@@ -47,10 +47,17 @@ struct AxisMapping
     XInputAxis xbox;
 };
 
+struct Button2AxisMapping
+{
+    int dinputOffset;
+    XInputAxis xbox;
+};
+
 struct Mapping
 {
     std::vector<ButtonMapping> buttons;
     std::vector<AxisMapping> axis;
+    std::vector<Button2AxisMapping> button2axis;
 };
 
 class ConfigLoader

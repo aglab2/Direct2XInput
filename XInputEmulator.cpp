@@ -4,6 +4,7 @@
 #include "wind.h"
 
 #include <filesystem>
+#include <optional>
 #include <string_view>
 
 #include <Xinput.h>
@@ -108,6 +109,60 @@ DWORD XInputEmulator::GetCapabilities(DWORD dwUserIndex, DWORD dwFlags, XINPUT_C
     return ERROR_SUCCESS;
 }
 
+static std::optional<long> readDInputAxis(const DIJOYSTATE2& state, const DInputAxis& axis)
+{
+    // scaled from 0 to 0xffff
+    long value;
+    LONG dinputRaw = *(const LONG*)(((const char*)&state) + axis.offset);
+    switch (axis.type)
+    {
+    case DInputAxisType::FULL:
+        value = std::clamp(dinputRaw, 0L, 0xffffL);
+        break;
+    case DInputAxisType::POSITIVE:
+        if (dinputRaw < 0x8000)
+            return std::nullopt;
+
+        value = (dinputRaw - 0x8000) * 2;
+        if (value > 0xffff)
+            value = 0xffff;
+
+        break;
+    case DInputAxisType::NEGATIVE:
+        if (dinputRaw > 0x8000)
+            return std::nullopt;
+
+        value = (0x7fff - dinputRaw) * 2;
+        if (value > 0xffff)
+            value = 0xffff;
+
+        break;
+    }
+
+    if (axis.inverted)
+    {
+        value = 0xffff - value;
+    }
+
+    return value;
+}
+
+static void writeXInputAxis(long value, XINPUT_GAMEPAD& gamepad, const XInputAxis& axis)
+{
+    void* xinputRaw = ((char*)&gamepad) + axis.offset;
+    switch (axis.type)
+    {
+    case XInputAxisType::BYTE:
+        // Rescale to 0 to 0xff
+        *(BYTE*)xinputRaw = (BYTE)(value >> 8);
+        break;
+    case XInputAxisType::SHORT:
+        // Rescale to -0x8000 to 0x7fff
+        *(SHORT*)xinputRaw = (SHORT)(value - 0x8000);
+        break;
+    }
+}
+
 XINPUT_GAMEPAD XInputEmulator::PollGamepad()
 {
     XINPUT_GAMEPAD gamepad{};
@@ -120,56 +175,15 @@ XINPUT_GAMEPAD XInputEmulator::PollGamepad()
     }
     for (const auto& axis : currentMapping_.axis)
     {
-        // 0 to 0xffff
-        long value = 0;
-
+        if (auto value = readDInputAxis(state, axis.dinput))
         {
-            LONG dinputRaw = *(LONG*)(((char*)&state) + axis.dinput.offset);
-            switch (axis.dinput.type)
-            {
-            case DInputAxisType::FULL:
-                value = std::clamp(dinputRaw, 0L, 0xffffL);
-                break;
-            case DInputAxisType::POSITIVE:
-                if (dinputRaw < 0x8000)
-                    continue;
-
-                value = (dinputRaw - 0x8000) * 2;
-                if (value > 0xffff)
-                    value = 0xffff;
-
-                break;
-            case DInputAxisType::NEGATIVE:
-                if (dinputRaw > 0x8000)
-                    continue;
-
-                value = dinputRaw * 2;
-                if (value > 0xffff)
-                    value = 0xffff;
-
-                break;
-            }
-
-            if (axis.dinput.inverted)
-            {
-                value = 0xffff - value;
-            }
+            writeXInputAxis(*value, gamepad, axis.xbox);
         }
-
-        {
-            void* xinputRaw = ((char*)&gamepad) + axis.xbox.offset;
-            switch (axis.xbox.type)
-            {
-            case XInputAxisType::BYTE:
-                // Rescale to 0 to 0xff
-                *(BYTE*)xinputRaw = (BYTE) (value >> 8);
-                break;
-            case XInputAxisType::SHORT:
-                // Rescale to -0x8000 to 0x7fff
-                *(SHORT*)xinputRaw = (SHORT) (value - 0x8000);
-                break;
-            }
-        }
+    }
+    for (const auto& b2a : currentMapping_.button2axis)
+    {
+        if (state.rgbButtons[b2a.dinputOffset] & 0x80)
+            writeXInputAxis(0xffff, gamepad, b2a.xbox);
     }
 
     return gamepad;

@@ -129,6 +129,8 @@ void ConfigLoader::onValue(const char* section, const char* name, const char* va
 	{
 		if (auto dAxis = decodeAsDInputAxis(value))
 			mapping_.axis.push_back({ *dAxis, *xAxis });
+		else if (auto off = atoi(value))
+			mapping_.button2axis.push_back({ off - 1, *xAxis });
 		else
 			WPRINTF("Failed to decode DInput axis '%s' corresponding to XInput axis '%s'", name, value);
 	}
